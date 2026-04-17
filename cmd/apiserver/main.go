@@ -60,7 +60,7 @@ func main() {
 
 	<-quitch
 	fmt.Println("shutting down in 3secs...")
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 3)
 }
 
 func handlePostJob(q data.Queuer) http.HandlerFunc {
