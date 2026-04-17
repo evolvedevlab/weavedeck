@@ -2,8 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
 
+	"github.com/evolvedevlab/weaveset/config"
 	"github.com/evolvedevlab/weaveset/data"
 	"github.com/evolvedevlab/weaveset/scraper"
 	"github.com/evolvedevlab/weaveset/util"
@@ -12,6 +19,9 @@ import (
 )
 
 func main() {
+	quitch := make(chan os.Signal, 1)
+	signal.Notify(quitch, os.Interrupt, syscall.SIGTERM)
+
 	godotenv.Load()
 	var (
 		hostname  = util.GetEnv("HOSTNAME")
@@ -22,6 +32,7 @@ func main() {
 		log.Fatal("HOSTNAME variable not provided")
 	}
 
+	ctx := context.Background()
 	rc := redis.NewClient(&redis.Options{
 		Addr:       redisAddr,
 		Password:   redisPass,
@@ -29,7 +40,13 @@ func main() {
 		ClientName: "worker",
 	})
 
-	ctx := context.Background()
+	// security group
+	// its noop if already created, will return an error of BUSYGROUP
+	err := rc.XGroupCreateMkStream(ctx, config.Stream, config.Group, "0").Err()
+	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
+		log.Fatal(err)
+	}
+
 	if err := rc.Ping(ctx).Err(); err != nil {
 		log.Fatal("redis ping error:", err)
 	}
@@ -41,6 +58,17 @@ func main() {
 	// 	CreatedAt: time.Now(),
 	// })
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	log.Println("Consume loop started...")
-	q.Consume(ctx, scraper.NewHandler(nil))
+	go func() {
+		if err := q.Consume(ctx, scraper.NewHandler(nil)); err != nil {
+			log.Println("consume error:", err)
+		}
+	}()
+
+	<-quitch
+	fmt.Println("shutting down in 3secs...")
+	time.Sleep(time.Second * 3)
 }

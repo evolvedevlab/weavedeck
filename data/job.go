@@ -10,6 +10,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// Handler is a generic interface for handling a job.
+// Handler can be anything, in our case its web scraper.
 type Handler interface {
 	Handle(context.Context, *Job) error
 }
@@ -25,6 +27,8 @@ type Job struct {
 	CreatedAt time.Time
 }
 
+// RedisQueue is an implementation of Queuer interface.
+// hostname is required and has to be unique across workers.
 type RedisQueue struct {
 	hostname string
 	stream   string
@@ -42,6 +46,7 @@ func NewRedisQueue(hostname, stream, group string, client *redis.Client) Queuer 
 }
 
 func (q *RedisQueue) Consume(ctx context.Context, handler Handler) error {
+	// loop to re-claim stale jobs (mostly due to failures)
 	go q.reaperLoop(ctx, handler)
 	for {
 		streams, err := q.client.XReadGroup(ctx, &redis.XReadGroupArgs{
@@ -52,6 +57,10 @@ func (q *RedisQueue) Consume(ctx context.Context, handler Handler) error {
 			Block:    0, // block forever
 		}).Result()
 		if err != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			slog.Error("Consume error", "hostname", q.hostname, "err", err)
 			continue
 		}
@@ -87,8 +96,8 @@ func (q *RedisQueue) reaperLoop(ctx context.Context, handler Handler) error {
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
 
-	start := "0"
 	for range ticker.C {
+		start := "0"
 		messages, next, err := q.client.XAutoClaim(ctx, &redis.XAutoClaimArgs{
 			Stream:   q.stream,
 			Group:    q.group,
@@ -98,6 +107,10 @@ func (q *RedisQueue) reaperLoop(ctx context.Context, handler Handler) error {
 			Count:    10,
 		}).Result()
 		if err != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			slog.Error("Reaper loop error", "hostname", q.hostname, "err", err)
 			break
 		}

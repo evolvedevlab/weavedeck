@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/evolvedevlab/weaveset/data"
 )
@@ -12,6 +13,8 @@ type Scraper interface {
 	Scrape(context.Context) (*data.List, error)
 }
 
+// Handler implements the data.Handler interface.
+// This handler is a responsible for scraping and storage.
 type Handler struct {
 	store any // TODO: add persistance
 }
@@ -23,7 +26,7 @@ func NewHandler(store any) data.Handler {
 }
 
 func (h *Handler) Handle(ctx context.Context, job *data.Job) error {
-	sc, err := NewGRScraper(job.URL)
+	sc, err := detectAndGetScraper(job.URL)
 	if err != nil {
 		return err
 	}
@@ -36,6 +39,20 @@ func (h *Handler) Handle(ctx context.Context, job *data.Job) error {
 	// TODO: store the guy
 	fmt.Println("list stored: ", list.Name)
 	return nil
+}
+
+func detectAndGetScraper(urlStr string) (Scraper, error) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+
+	switch u.Hostname() {
+	case "goodreads.com", "www.goodreads.com":
+		return NewGRScraper(urlStr)
+	}
+
+	return nil, fmt.Errorf("cannot handle the given URL")
 }
 
 func addRequestHeaders(r *http.Request) {

@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
-	"strings"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/evolvedevlab/weaveset/config"
 	"github.com/evolvedevlab/weaveset/data"
 	"github.com/evolvedevlab/weaveset/util"
 	"github.com/google/uuid"
@@ -15,6 +19,9 @@ import (
 )
 
 func main() {
+	quitch := make(chan os.Signal, 1)
+	signal.Notify(quitch, os.Interrupt, syscall.SIGTERM)
+
 	godotenv.Load()
 	var (
 		listenAddr = util.GetEnv("LISTEN_ADDR", ":3000")
@@ -23,6 +30,9 @@ func main() {
 		redisAddr = util.GetEnv("REDIS_ADDR", "127.0.0.1:6379")
 		redisPass = util.GetEnv("REDIS_PASSWORD")
 	)
+	if len(hostname) == 0 {
+		log.Fatal("HOSTNAME variable not provided")
+	}
 
 	rc := redis.NewClient(&redis.Options{
 		Addr:       redisAddr,
@@ -31,25 +41,26 @@ func main() {
 		ClientName: "apiserver",
 	})
 
-	ctx := context.Background()
-	if err := rc.Ping(ctx).Err(); err != nil {
+	if err := rc.Ping(context.Background()).Err(); err != nil {
 		log.Fatal("redis ping:", err)
 	}
 
-	// security group
-	// its noop if already created, will return an error of BUSYGROUP
-	err := rc.XGroupCreateMkStream(ctx, "jobs", "workers", "0").Err()
-	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
-		log.Fatal(err)
-	}
+	q := data.NewRedisQueue(hostname, config.Stream, config.Group, rc)
 
-	q := data.NewRedisQueue(hostname, "jobs", "workers", rc)
-
+	// routes
 	http.HandleFunc("/health", handleGetHealth)
 	http.HandleFunc("/job", handlePostJob(q))
 
 	log.Printf("started at %s\n", listenAddr)
-	log.Fatal(http.ListenAndServe(listenAddr, nil))
+	go func() {
+		if err := http.ListenAndServe(listenAddr, nil); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	<-quitch
+	fmt.Println("shutting down in 3secs...")
+	time.Sleep(time.Second * 5)
 }
 
 func handlePostJob(q data.Queuer) http.HandlerFunc {

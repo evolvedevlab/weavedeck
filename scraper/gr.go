@@ -22,10 +22,7 @@ func NewGRScraper(urlStr string) (Scraper, error) {
 		return nil, err
 	}
 
-	if !(u.Hostname() == "goodreads.com" || u.Hostname() == "www.goodreads.com") {
-		return nil, fmt.Errorf("invalid goodreads URL")
-	}
-	if !strings.HasPrefix(u.Path, "/list/show/") {
+	if !isValidGoodreadsURL(u) {
 		return nil, fmt.Errorf("invalid goodreads list URL")
 	}
 
@@ -128,4 +125,14 @@ func (sc grScraper) collectItem(s *goquery.Selection, item *data.Item) {
 		}
 
 	})
+}
+
+func isValidGoodreadsURL(url *url.URL) bool {
+	if !(url.Hostname() == "goodreads.com" || url.Hostname() == "www.goodreads.com") {
+		return false
+	}
+	if !strings.HasPrefix(url.Path, "/list/show/") {
+		return false
+	}
+	return true
 }
