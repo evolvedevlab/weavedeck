@@ -33,6 +33,7 @@ go.work.sum
 
 bin
 test
+testdata
 site/public
 site/resources
 site/content/list/*.md

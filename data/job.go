@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/evolvedevlab/weaveset/config"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -145,7 +146,7 @@ func (q *RedisQueue) handleMessage(ctx context.Context, msg redis.XMessage, hand
 	}
 
 	// ACK if too many retries
-	if retries >= 10 {
+	if retries >= config.MaxJobRetryLimit {
 		err := q.client.XAck(ctx, q.stream, q.group, msg.ID).Err()
 		return err
 	}

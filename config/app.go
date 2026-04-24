@@ -8,4 +8,6 @@ const (
 const (
 	Stream = "jobs"
 	Group  = "workers"
+
+	MaxJobRetryLimit = 10
 )

@@ -24,8 +24,9 @@ func main() {
 
 	godotenv.Load()
 	var (
-		listenAddr = util.GetEnv("LISTEN_ADDR", ":3000")
-		hostname   = util.GetEnv("HOSTNAME")
+		listenAddr    = util.GetEnv("LISTEN_ADDR", ":3000")
+		hostname      = util.GetEnv("HOSTNAME")
+		publicDirPath = util.GetEnv("PUBLIC_DIR_PATH", "site/public")
 
 		redisAddr = util.GetEnv("REDIS_ADDR", "127.0.0.1:6379")
 		redisPass = util.GetEnv("REDIS_PASSWORD")
@@ -40,6 +41,7 @@ func main() {
 		DB:         0,
 		ClientName: "apiserver",
 	})
+	defer rc.Close()
 
 	if err := rc.Ping(context.Background()).Err(); err != nil {
 		log.Fatal("redis ping:", err)
@@ -48,7 +50,7 @@ func main() {
 	q := data.NewRedisQueue(hostname, config.Stream, config.Group, rc)
 
 	// routes
-	http.HandleFunc("/", http.FileServer(http.Dir("site/public")).ServeHTTP)
+	http.Handle("/", http.FileServer(http.Dir(publicDirPath)))
 	http.HandleFunc("/health", handleGetHealth)
 	http.HandleFunc("/job", handlePostJob(q))
 

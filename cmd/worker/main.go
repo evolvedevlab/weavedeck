@@ -45,6 +45,11 @@ func main() {
 		DB:         0,
 		ClientName: "worker",
 	})
+	defer rc.Close()
+
+	if err := rc.Ping(ctx).Err(); err != nil {
+		log.Fatal("redis ping error:", err)
+	}
 
 	// security group
 	// its noop if already created, will return an error of BUSYGROUP
@@ -53,16 +58,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := rc.Ping(ctx).Err(); err != nil {
-		log.Fatal("redis ping error:", err)
-	}
-
 	q := data.NewRedisQueue(hostname, config.Stream, config.Group, rc)
-	// q.Enqueue(ctx, &data.Job{
-	// 	ID:        uuid.New().String(),
-	// 	URL:       "https://www.goodreads.com/list/show/399714",
-	// 	CreatedAt: time.Now(),
-	// })
 
 	fsStore, err := store.NewFileSystem(contentDirPath, nil)
 	if err != nil {

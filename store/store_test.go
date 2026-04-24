@@ -1,22 +1,26 @@
 package store
 
 import (
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/evolvedevlab/weaveset/data"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestStore_Save(t *testing.T) {
-	s, err := NewFileSystem("../test", nil) // TODO: fix stuff
-	if err != nil {
-		t.Error(err)
+func Test_Filepathgenerator(t *testing.T) {
+	a := assert.New(t)
+
+	dir := "tesdata"
+	list := &data.List{
+		ID:        "1",
+		Name:      "test 1",
+		CreatedAt: time.Now(),
 	}
 
-	err = s.Save(&data.List{
-		ID:   "someid",
-		Name: "Best 2025 Novels to read this summer!",
-	})
-	if err != nil {
-		t.Error(err)
-	}
+	expectedPath := filepath.Join(dir, "test-1-1.md")
+	filepath := DefaultFilepathGeneratorFunc(dir)(list)
+
+	a.Equal(expectedPath, filepath)
 }
