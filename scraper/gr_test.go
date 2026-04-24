@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGRScraper_Validation(t *testing.T) {
+func TestGRScraper_URLValidation(t *testing.T) {
 	a := assert.New(t)
 	t.Parallel()
 
@@ -14,6 +14,9 @@ func TestGRScraper_Validation(t *testing.T) {
 	a.Error(err)
 
 	_, err = NewGRScraper("https://www.goodreads.com/list/")
+	a.Error(err)
+
+	_, err = NewGRScraper("https://www.goodreads.com/list/show/")
 	a.Error(err)
 
 	sc, err := NewGRScraper("https://www.goodreads.com/list/show/69")

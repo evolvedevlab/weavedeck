@@ -35,11 +35,8 @@ type FileSystem struct {
 }
 
 func NewFileSystem(dirPath string, fn FilepathGeneratorFunc) (*FileSystem, error) {
-	var filepathGeneratorFunc FilepathGeneratorFunc
-	if fn != nil {
-		filepathGeneratorFunc = fn
-	} else {
-		filepathGeneratorFunc = DefaultFilepathGeneratorFunc(dirPath)
+	if fn == nil {
+		fn = DefaultFilepathGeneratorFunc(dirPath)
 	}
 
 	file, err := os.OpenFile(filepath.Join(dirPath, config.TriggerModifyFilename), os.O_CREATE|os.O_WRONLY, 0644)
@@ -49,7 +46,7 @@ func NewFileSystem(dirPath string, fn FilepathGeneratorFunc) (*FileSystem, error
 
 	return &FileSystem{
 		dirPath:           dirPath,
-		filepathGenerator: filepathGeneratorFunc,
+		filepathGenerator: fn,
 		file:              file,
 	}, nil
 }

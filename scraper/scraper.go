@@ -17,7 +17,7 @@ type Scraper interface {
 // Handler implements the data.Handler interface.
 // This handler is a responsible for scraping and storage.
 type Handler struct {
-	store store.Storer // TODO: add persistance
+	store store.Storer
 }
 
 func NewHandler(store store.Storer) data.Handler {

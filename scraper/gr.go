@@ -160,6 +160,14 @@ func isValidGoodreadsURL(url *url.URL) bool {
 	if !strings.HasPrefix(url.Path, "/list/show/") {
 		return false
 	}
+
+	parts := strings.Split(url.Path, "/")
+	last := parts[len(parts)-1]
+	_, err := strconv.Atoi(last)
+	if err != nil {
+		return false
+	}
+
 	return true
 }
 

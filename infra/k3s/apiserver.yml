@@ -28,7 +28,10 @@ spec:
             - name: REDIS_ADDR
               value: "redis:6379"
             - name: REDIS_PASSWORD
-              value: "npaulweaveset"
+              valueFrom:
+                secretKeyRef:
+                  name: weaveset-secrets
+                  key: REDIS_PASSWORD
           volumeMounts:
             - name: site
               mountPath: /app/site

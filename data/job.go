@@ -3,11 +3,16 @@ package data
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+)
+
+var (
+	errExceededRetryLimit = errors.New("job has exceeded the set retry limit")
 )
 
 // Handler is a generic interface for handling a job.
@@ -68,7 +73,9 @@ func (q *RedisQueue) Consume(ctx context.Context, handler Handler) error {
 		for _, stream := range streams {
 			for _, msg := range stream.Messages {
 				if err := q.handleMessage(ctx, msg, handler); err != nil {
-					slog.Error("Consume error", "hostname", q.hostname, "msg", msg, "err", err)
+					if !errors.Is(err, errExceededRetryLimit) {
+						slog.Error("Consume error", "hostname", q.hostname, "msg", msg, "err", err)
+					}
 				}
 			}
 		}
@@ -96,8 +103,8 @@ func (q *RedisQueue) reaperLoop(ctx context.Context, handler Handler) error {
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
 
+	start := "0"
 	for range ticker.C {
-		start := "0"
 		messages, next, err := q.client.XAutoClaim(ctx, &redis.XAutoClaimArgs{
 			Stream:   q.stream,
 			Group:    q.group,
@@ -132,20 +139,70 @@ func (q *RedisQueue) reaperLoop(ctx context.Context, handler Handler) error {
 }
 
 func (q *RedisQueue) handleMessage(ctx context.Context, msg redis.XMessage, handler Handler) error {
+	retries, err := q.getRetryCount(ctx, msg.ID)
+	if err != nil {
+		return err
+	}
+
+	// ACK if too many retries
+	if retries >= 10 {
+		err := q.client.XAck(ctx, q.stream, q.group, msg.ID).Err()
+		return err
+	}
+
+	job, err := q.readMessageData(msg)
+
+	err = handler.Handle(ctx, job)
+	if err != nil {
+		// increment retry count
+		if err := q.incrRetryCount(ctx, msg.ID); err != nil {
+			return err
+		}
+		return errExceededRetryLimit // leave as is
+	}
+
+	err = q.client.XAck(ctx, q.stream, q.group, msg.ID).Err()
+	if err != nil {
+		return err
+	}
+
+	// delete retries count
+	err = q.client.Del(ctx, "retries:"+msg.ID).Err()
+	return err
+}
+
+func (q *RedisQueue) incrRetryCount(ctx context.Context, msgID string) error {
+	key := "retries:" + msgID
+
+	pipe := q.client.TxPipeline()
+	pipe.Incr(ctx, key)
+	pipe.Expire(ctx, key, time.Hour*4)
+
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func (q *RedisQueue) getRetryCount(ctx context.Context, msgID string) (int64, error) {
+	n, err := q.client.Get(ctx, "retries:"+msgID).Int64()
+	if err != nil {
+		if err == redis.Nil {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return n, nil
+}
+
+func (q *RedisQueue) readMessageData(msg redis.XMessage) (*Job, error) {
 	raw, ok := msg.Values["data"].(string)
 	if !ok {
-		return fmt.Errorf("invalid payload data")
+		return nil, fmt.Errorf("invalid payload data")
 	}
 
 	var job Job
 	if err := json.Unmarshal([]byte(raw), &job); err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := handler.Handle(ctx, &job); err != nil {
-		return err
-	}
-
-	err := q.client.XAck(ctx, q.stream, q.group, msg.ID).Err()
-	return err
+	return &job, nil
 }
