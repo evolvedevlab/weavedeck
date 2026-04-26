@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -20,22 +21,20 @@ type GRScraper struct {
 	URL *url.URL
 }
 
-func NewGRScraper(urlStr string) (*GRScraper, error) {
-	u, err := url.Parse(urlStr)
+func NewGRScraper() Scraper {
+	return &GRScraper{}
+}
+
+func (sc *GRScraper) Scrape(ctx context.Context, URL string) (*data.List, error) {
+	var err error
+	sc.URL, err = url.Parse(URL)
 	if err != nil {
 		return nil, err
 	}
-
-	if !isValidGoodreadsURL(u) {
+	if !isValidGoodreadsURL(sc.URL) {
 		return nil, fmt.Errorf("invalid goodreads list URL")
 	}
 
-	return &GRScraper{
-		URL: u,
-	}, nil
-}
-
-func (sc *GRScraper) Scrape(ctx context.Context) (*data.List, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sc.URL.String(), nil)
 	if err != nil {
 		return nil, err
@@ -160,15 +159,16 @@ func isValidGoodreadsURL(url *url.URL) bool {
 	if !strings.HasPrefix(url.Path, "/list/show/") {
 		return false
 	}
-
-	parts := strings.Split(url.Path, "/")
-	last := parts[len(parts)-1]
-	_, err := strconv.Atoi(last)
-	if err != nil {
+	last := path.Base(url.Path)
+	if last == "" {
 		return false
 	}
 
-	return true
+	// take only numeric prefix before optional "."
+	idPart := strings.SplitN(last, ".", 2)[0]
+
+	_, err := strconv.Atoi(idPart)
+	return err == nil
 }
 
 func getLargestImageURL(url string) string {

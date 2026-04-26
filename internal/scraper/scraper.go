@@ -3,15 +3,17 @@ package scraper
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/evolvedevlab/weaveset/data"
-	"github.com/evolvedevlab/weaveset/store"
+	"github.com/evolvedevlab/weaveset/internal/store"
 )
 
 type Scraper interface {
-	Scrape(context.Context) (*data.List, error)
+	Scrape(context.Context, string) (*data.List, error)
 }
 
 // Handler implements the data.Handler interface.
@@ -31,13 +33,38 @@ func (h *Handler) Handle(ctx context.Context, job *data.Job) error {
 	if err != nil {
 		return err
 	}
+	sc = NewLoggingScraper(sc)
 
-	list, err := sc.Scrape(ctx)
+	list, err := sc.Scrape(ctx, job.URL)
 	if err != nil {
 		return err
 	}
 
 	return h.store.Save(list)
+}
+
+type loggingScraper struct {
+	next Scraper
+}
+
+func NewLoggingScraper(sc Scraper) Scraper {
+	return &loggingScraper{next: sc}
+}
+
+func (s *loggingScraper) Scrape(ctx context.Context, url string) (*data.List, error) {
+	start := time.Now()
+	slog.Info("scrape_start", "url", url, "start", start)
+
+	list, err := s.next.Scrape(ctx, url)
+
+	took := time.Since(start)
+	if err != nil {
+		slog.Error("scrape_failed", "url", url, "took_ms", took.Milliseconds(), "err", err)
+		return nil, err
+	}
+
+	slog.Info("scrape_success", "url", url, "took_ms", took.Milliseconds())
+	return list, nil
 }
 
 func detectAndGetScraper(urlStr string) (Scraper, error) {
@@ -48,7 +75,7 @@ func detectAndGetScraper(urlStr string) (Scraper, error) {
 
 	switch u.Hostname() {
 	case "goodreads.com", "www.goodreads.com":
-		return NewGRScraper(urlStr)
+		return NewGRScraper(), nil
 	}
 
 	return nil, fmt.Errorf("cannot handle the given URL")

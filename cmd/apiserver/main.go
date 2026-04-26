@@ -3,17 +3,16 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
-	"net/url"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"github.com/evolvedevlab/weaveset/apiserver"
 	"github.com/evolvedevlab/weaveset/config"
-	"github.com/evolvedevlab/weaveset/data"
+	"github.com/evolvedevlab/weaveset/internal"
+	"github.com/evolvedevlab/weaveset/internal/queue"
 	"github.com/evolvedevlab/weaveset/util"
-	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 )
@@ -24,6 +23,7 @@ func main() {
 
 	godotenv.Load()
 	var (
+		isProd        = util.GetEnv("ENVIRONMENT") == "production"
 		listenAddr    = util.GetEnv("LISTEN_ADDR", ":3000")
 		hostname      = util.GetEnv("HOSTNAME")
 		publicDirPath = util.GetEnv("PUBLIC_DIR_PATH", "site/public")
@@ -34,6 +34,9 @@ func main() {
 	if len(hostname) == 0 {
 		log.Fatal("HOSTNAME variable not provided")
 	}
+
+	l := internal.NewLogger(isProd)
+	slog.SetDefault(l)
 
 	rc := redis.NewClient(&redis.Options{
 		Addr:       redisAddr,
@@ -47,50 +50,15 @@ func main() {
 		log.Fatal("redis ping:", err)
 	}
 
-	q := data.NewRedisQueue(hostname, config.Stream, config.Group, rc)
+	q := queue.NewRedisQueue(hostname, config.Stream, config.Group, rc)
+	s := apiserver.New(listenAddr, publicDirPath, q)
 
-	// routes
-	http.Handle("/", http.FileServer(http.Dir(publicDirPath)))
-	http.HandleFunc("/health", handleGetHealth)
-	http.HandleFunc("/job", handlePostJob(q))
-
-	log.Printf("started at %s\n", listenAddr)
 	go func() {
-		if err := http.ListenAndServe(listenAddr, nil); err != nil {
+		if err := s.Start(); err != nil {
 			log.Println("http serve error:", err)
 		}
 	}()
 
 	<-quitch
 	log.Println("shutting down...")
-}
-
-func handlePostJob(q data.Queuer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		u, err := url.Parse(r.URL.Query().Get("url"))
-		if err != nil || u.Scheme == "" || u.Host == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("invalid url"))
-			return
-		}
-
-		err = q.Enqueue(r.Context(), &data.Job{
-			ID:        uuid.New().String(),
-			URL:       u.String(),
-			CreatedAt: time.Now(),
-		})
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("task queued!"))
-	}
-}
-
-func handleGetHealth(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK!"))
 }

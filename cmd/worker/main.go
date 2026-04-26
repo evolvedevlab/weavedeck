@@ -14,9 +14,10 @@ import (
 	"time"
 
 	"github.com/evolvedevlab/weaveset/config"
-	"github.com/evolvedevlab/weaveset/data"
-	"github.com/evolvedevlab/weaveset/scraper"
-	"github.com/evolvedevlab/weaveset/store"
+	"github.com/evolvedevlab/weaveset/internal"
+	"github.com/evolvedevlab/weaveset/internal/queue"
+	"github.com/evolvedevlab/weaveset/internal/scraper"
+	"github.com/evolvedevlab/weaveset/internal/store"
 	"github.com/evolvedevlab/weaveset/util"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
@@ -28,6 +29,7 @@ func main() {
 
 	godotenv.Load()
 	var (
+		isProd    = util.GetEnv("ENVIRONMENT") == "production"
 		hostname  = util.GetEnv("HOSTNAME")
 		redisAddr = util.GetEnv("REDIS_ADDR", "127.0.0.1:6379")
 		redisPass = util.GetEnv("REDIS_PASSWORD")
@@ -37,6 +39,9 @@ func main() {
 	if len(hostname) == 0 {
 		log.Fatal("HOSTNAME variable not provided")
 	}
+
+	l := internal.NewLogger(isProd)
+	slog.SetDefault(l)
 
 	ctx := context.Background()
 	rc := redis.NewClient(&redis.Options{
@@ -58,7 +63,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	q := data.NewRedisQueue(hostname, config.Stream, config.Group, rc)
+	q := queue.NewRedisQueue(hostname, config.Stream, config.Group, rc)
 
 	fsStore, err := store.NewFileSystem(contentDirPath, nil)
 	if err != nil {
@@ -69,7 +74,7 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	log.Println("Consume loop started...")
+	log.Println("Consume loop started:", hostname)
 	go func() {
 		if err := q.Consume(ctx, scraper.NewHandler(fsStore)); err != nil {
 			log.Println("consume error:", err)

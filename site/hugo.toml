@@ -35,9 +35,6 @@ type = 'local'
     type = 'submit'
 
 [[Params.widgets.homepage]]
-    type = 'search'
-
-[[Params.widgets.homepage]]
     type = 'categories'
 
 [[Params.widgets.homepage]]
