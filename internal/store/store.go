@@ -21,6 +21,7 @@ var DefaultFilepathGeneratorFunc = func(dirPath string) FilepathGeneratorFunc {
 
 type Storer interface {
 	Save(*data.List) error
+	Delete(string) error
 }
 
 type ReadWriteSeekTruncater interface {

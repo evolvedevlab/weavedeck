@@ -7,6 +7,7 @@ import (
 
 	"github.com/evolvedevlab/weaveset/data"
 	"github.com/evolvedevlab/weaveset/internal/queue"
+	"github.com/evolvedevlab/weaveset/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -27,6 +28,20 @@ func handlePostJob(q queue.Queuer) ApiHandlerFunc {
 		}
 
 		return writeJSON(w, http.StatusOK, "task queued!")
+	}
+}
+
+func handleDeleteList(s store.Storer) ApiHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		slug := r.PathValue("slug")
+		if len(slug) == 0 {
+			return NewBadRequestError("invalid slug", nil)
+		}
+
+		if err := s.Delete(slug); err != nil {
+			return err
+		}
+		return writeJSON(w, http.StatusOK, "deleted: "+slug)
 	}
 }
 

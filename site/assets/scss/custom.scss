@@ -1,0 +1,28 @@
+.article-header-content {
+  position: relative;
+
+  .article-delete-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    background: transparent;
+    border: none;
+    padding: 6px;
+    cursor: pointer;
+
+    color: var(--card-text-color-secondary);
+    opacity: 0.6;
+    transition: all 0.2s ease;
+
+    &:hover {
+      opacity: 1;
+      color: red;
+      transform: scale(1.05);
+    }
+  }
+}

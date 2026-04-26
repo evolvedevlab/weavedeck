@@ -1,0 +1,59 @@
+{{- $IsList := .IsList -}}
+{{- $Page := .Page -}}
+
+<header class="article-header">
+    {{- $image := partial "helper/image" (dict "Image" $Page.Params.image "Resources" $Page.Resources "Context" $Page) -}}
+    {{ if $image }}
+    <div class="article-image">
+        <a href="{{ $Page.RelPermalink }}">
+            {{ partial "helper/responsive-image" (dict
+                "Resource" $image.Resource
+                "Widths" (cond $Page.Site.Params.ImageProcessing.Content.Enabled $Page.Site.Params.ImageProcessing.Content.Widths nil)
+                "Attributes" (dict
+                    "src" $image.Permalink
+                    "width" $image.Width
+                    "height" $image.Height
+                    "alt" (printf "Featured image of post %s" $Page.Title)
+                    "loading" "lazy"
+                    "sizes" "(max-width: 767px) calc(100vw - 30px), (max-width: 1023px) 700px, (max-width: 1279px) 950px, 1232px"
+                )
+            ) }}
+        </a>
+    </div>
+    {{ end }}
+
+    <div class="article-header-content">
+        {{ if $IsList }}
+        <button
+            class="article-delete-btn"
+            aria-label="Delete post {{ $Page.Title }}"
+            data-slug="{{ $Page.File.BaseFileName }}"
+            onclick="handleDelete(this)"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                <path d="M3 6h18"/>
+                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+        </button>
+        {{ end }}
+
+        {{ partial "article/components/details" (dict "Page" $Page "IsList" $IsList) }}
+    </div>
+</header>
+
+<script>
+    async function handleDelete(e) {
+      const slug = e.getAttribute('data-slug') || '';
+      const res = await fetch(`/list/${slug}`, {
+        method: 'DELETE'
+      })
+
+      const data = await res.text()
+      if (res.ok) {
+          alert(data)
+      } else {
+          alert('failed: '+data)
+      }
+    }
+</script>

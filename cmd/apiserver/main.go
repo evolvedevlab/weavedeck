@@ -12,6 +12,7 @@ import (
 	"github.com/evolvedevlab/weaveset/config"
 	"github.com/evolvedevlab/weaveset/internal"
 	"github.com/evolvedevlab/weaveset/internal/queue"
+	"github.com/evolvedevlab/weaveset/internal/store"
 	"github.com/evolvedevlab/weaveset/util"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
@@ -23,10 +24,11 @@ func main() {
 
 	godotenv.Load()
 	var (
-		isProd        = util.GetEnv("ENVIRONMENT") == "production"
-		listenAddr    = util.GetEnv("LISTEN_ADDR", ":3000")
-		hostname      = util.GetEnv("HOSTNAME")
-		publicDirPath = util.GetEnv("PUBLIC_DIR_PATH", "site/public")
+		isProd         = util.GetEnv("ENVIRONMENT") == "production"
+		listenAddr     = util.GetEnv("LISTEN_ADDR", ":3000")
+		hostname       = util.GetEnv("HOSTNAME")
+		publicDirPath  = util.GetEnv("PUBLIC_DIR_PATH", "site/public")
+		contentDirPath = util.GetEnv("CONTENT_DIR_PATH", "site/content/list")
 
 		redisAddr = util.GetEnv("REDIS_ADDR", "127.0.0.1:6379")
 		redisPass = util.GetEnv("REDIS_PASSWORD")
@@ -51,7 +53,13 @@ func main() {
 	}
 
 	q := queue.NewRedisQueue(hostname, config.Stream, config.Group, rc)
-	s := apiserver.New(listenAddr, publicDirPath, q)
+	store, err := store.NewFileSystem(contentDirPath, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer store.Close()
+
+	s := apiserver.New(listenAddr, publicDirPath, q, store)
 
 	go func() {
 		if err := s.Start(); err != nil {
