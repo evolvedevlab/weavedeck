@@ -32,7 +32,6 @@ func NewRedisQueue(hostname, stream, group string, client *redis.Client) Queuer 
 }
 
 func (q *RedisQueue) Consume(ctx context.Context, handler data.Handler) error {
-	// loop to re-claim stale jobs (mostly due to failures)
 	go q.reaperLoop(ctx, handler)
 	for {
 		streams, err := q.client.XReadGroup(ctx, &redis.XReadGroupArgs{
@@ -82,6 +81,7 @@ func (q *RedisQueue) Enqueue(ctx context.Context, job *data.Job) error {
 	return err
 }
 
+// loop to re-claim stale jobs (mostly due to failures)
 func (q *RedisQueue) reaperLoop(ctx context.Context, handler data.Handler) error {
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
@@ -174,7 +174,7 @@ func (q *RedisQueue) processMessage(ctx context.Context, msg redis.XMessage, job
 	}
 
 	// delete retries count
-	err = q.client.Del(ctx, "retries:"+msg.ID).Err()
+	err = q.client.Del(ctx, getRetryKey(job.ID)).Err()
 	return err
 }
 
@@ -189,18 +189,18 @@ func (q *RedisQueue) dropMessage(ctx context.Context, msgID string) error {
 }
 
 func (q *RedisQueue) incrRetryCount(ctx context.Context, jobID string) error {
-	key := "retries:" + jobID
+	key := getRetryKey(jobID)
 
 	pipe := q.client.TxPipeline()
 	pipe.Incr(ctx, key)
-	pipe.Expire(ctx, key, time.Hour*4)
+	pipe.Expire(ctx, key, time.Hour)
 
 	_, err := pipe.Exec(ctx)
 	return err
 }
 
 func (q *RedisQueue) getRetryCount(ctx context.Context, jobID string) (int64, error) {
-	n, err := q.client.Get(ctx, "retries:"+jobID).Int64()
+	n, err := q.client.Get(ctx, getRetryKey(jobID)).Int64()
 	if err != nil {
 		if err == redis.Nil {
 			return 0, nil
