@@ -3,15 +3,13 @@ package queue
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
+	"math/rand"
 	"time"
 
 	"github.com/evolvedevlab/weaveset/config"
 	"github.com/evolvedevlab/weaveset/data"
 )
-
-// WARN: Not safe to use. Need synchronization...
 
 const (
 	maxInFlight = 1000
@@ -31,10 +29,20 @@ func newWMessage(job *data.Job) *wMessage {
 	}
 }
 
+type result struct {
+	messageID string
+	err       error
+}
+
+// WARN: data map is not concurrent safe.
+// Should only be touched in schedular loop
 type WorkerPool struct {
-	n     int // number of workers
-	msgch chan *wMessage
-	data  map[string]*wMessage
+	n int // number of workers
+
+	data      map[string]*wMessage
+	enqueuech chan *data.Job
+	workch    chan *wMessage
+	resultch  chan *result
 }
 
 func NewWorkerPool(concurrency, buffer int) Queuer {
@@ -45,139 +53,130 @@ func NewWorkerPool(concurrency, buffer int) Queuer {
 		buffer = 100
 	}
 	return &WorkerPool{
-		n:     concurrency,
-		msgch: make(chan *wMessage, buffer),
-		data:  make(map[string]*wMessage),
+		n:         concurrency,
+		data:      make(map[string]*wMessage),
+		enqueuech: make(chan *data.Job, buffer),
+		resultch:  make(chan *result, concurrency*2),
+		workch:    make(chan *wMessage, concurrency),
 	}
 }
 
-func (q *WorkerPool) Consume(ctx context.Context, handler data.Handler) error {
-	for i := 0; i < q.n; i++ {
-		go q.worker(ctx, handler)
+func (wp *WorkerPool) Consume(ctx context.Context, handler data.Handler) error {
+	for i := 0; i < wp.n; i++ {
+		go wp.worker(ctx, handler)
 	}
-	go q.reaperLoop(ctx)
+	go wp.scheduler(ctx)
 
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func (q *WorkerPool) Enqueue(ctx context.Context, job *data.Job) error {
-	if len(q.data) >= maxInFlight {
-		return fmt.Errorf("queue full")
-	}
-
-	msg := newWMessage(job)
-	q.data[msg.ID] = msg
-
+func (wp *WorkerPool) Enqueue(ctx context.Context, job *data.Job) error {
 	select {
-	case q.msgch <- msg:
-		return nil
 	case <-ctx.Done():
-		delete(q.data, job.ID)
 		return ctx.Err()
+	case wp.enqueuech <- job:
+		return nil
 	}
 }
 
-func (q *WorkerPool) reaperLoop(ctx context.Context) error {
+func (wp *WorkerPool) scheduler(ctx context.Context) {
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return
+		case job := <-wp.enqueuech:
+			if len(wp.data) >= maxInFlight {
+				slog.Warn("queue_full", "job_id", job.ID)
+				continue
+			}
+
+			msg := newWMessage(job)
+			msg.inFlight = true
+			wp.data[msg.ID] = msg
+
+			wp.workch <- msg
+		case res := <-wp.resultch:
+			msg, ok := wp.data[res.messageID]
+			if !ok {
+				continue
+			}
+
+			if res.err != nil {
+				// if its an non-retryable error, drop it entirely
+				var nrErr data.NonRetryableError
+				if errors.As(res.err, &nrErr) {
+					wp.dropMessage(msg)
+					continue
+				}
+
+				// drop if too many retries
+				if msg.retries >= config.MaxJobRetryLimit {
+					slog.Error("job_processing_dropped", "msg_id", res.messageID, "err", res.err)
+					wp.dropMessage(msg)
+					continue
+				}
+
+				// schedule for retrial
+				wp.doRetry(msg)
+			} else {
+				// success
+				wp.dropMessage(msg)
+			}
 		case <-ticker.C:
-			for _, msg := range q.data {
-				if q.shouldRetry(msg.ID) {
-					q.msgch <- msg
+			now := time.Now()
+			for _, msg := range wp.data {
+				// if idle and retry limit hasn't reached
+				if !msg.inFlight && now.Sub(msg.last) >= backoff(msg.retries) {
+					msg.inFlight = true
+					wp.workch <- msg
 				}
 			}
 		}
 	}
 }
 
-func (q *WorkerPool) worker(ctx context.Context, handler data.Handler) {
+func (wp *WorkerPool) worker(ctx context.Context, handler data.Handler) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case msg := <-q.msgch:
-			msg.inFlight = true
-			if err := q.handleMessage(ctx, msg, handler); err != nil {
-				if errors.Is(err, errExceededRetryLimit) {
-					slog.Info("job_dropped", "msg_id", msg.ID, "err", err)
-				} else {
-					slog.Error("job_processing_failed",
-						"op", "worker_handleMessage",
-						"msg_id", msg.ID,
-						"err", err)
-				}
+		case msg := <-wp.workch:
+			err := handler.Handle(ctx, msg.Job)
+			wp.resultch <- &result{
+				messageID: msg.ID,
+				err:       err,
 			}
-
-			msg.last = time.Now()
-			msg.inFlight = false
 		}
 	}
 }
 
-func (q *WorkerPool) handleMessage(ctx context.Context, msg *wMessage, handler data.Handler) error {
-	retries, err := q.getRetryCount(msg.Job.ID)
-	if err != nil {
-		return err
-	}
-
-	if retries >= config.MaxJobRetryLimit {
-		return q.dropMessage(msg.ID)
-	}
-
-	err = q.processMessage(ctx, msg, handler)
-	return err
-}
-
-func (q *WorkerPool) processMessage(ctx context.Context, msg *wMessage, handler data.Handler) error {
-	err := handler.Handle(ctx, msg.Job)
-	if err != nil {
-		// increment retry count
-		if err := q.incrRetryCount(msg.Job.ID); err != nil {
-			return err
-		}
-		return err
-	}
-
-	delete(q.data, msg.ID)
-	return nil
-}
-
-func (q *WorkerPool) dropMessage(msgID string) error {
-	delete(q.data, msgID)
-	return errExceededRetryLimit
-}
-
-func (q *WorkerPool) shouldRetry(msgID string) bool {
-	msg, ok := q.data[msgID]
-	if !ok {
-		return false
-	}
-
-	wait := backoffBase * time.Duration(1<<msg.retries)
-	return !msg.inFlight && time.Since(msg.last) >= wait
-}
-
-func (q *WorkerPool) incrRetryCount(jobID string) error {
-	msg, ok := q.data[jobID]
-	if !ok {
-		return fmt.Errorf("message not found") // not found
-	}
-
+func (wp *WorkerPool) doRetry(msg *wMessage) {
 	msg.retries++
-	return nil
+	msg.last = time.Now()
+	msg.inFlight = false
 }
 
-func (q *WorkerPool) getRetryCount(jobID string) (int, error) {
-	msg, ok := q.data[jobID]
-	if !ok {
-		return 0, nil // not found
+func (wp *WorkerPool) dropMessage(msg *wMessage) {
+	delete(wp.data, msg.ID)
+}
+
+func backoff(retries int) time.Duration {
+	const max = 1 * time.Minute
+	if retries > 6 {
+		return max
 	}
 
-	return msg.retries, nil
+	d := backoffBase * time.Duration(1<<retries)
+
+	// jitter: ±25%
+	jitter := d / 4
+	d = d - jitter + time.Duration(rand.Int63n(int64(2*jitter)))
+	if d > max {
+		return max
+	}
+	return d
 }

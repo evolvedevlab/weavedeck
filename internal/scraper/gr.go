@@ -29,10 +29,10 @@ func (sc *GRScraper) Scrape(ctx context.Context, URL string) (*data.List, error)
 	var err error
 	sc.URL, err = url.Parse(URL)
 	if err != nil {
-		return nil, err
+		return nil, data.NonRetry(err)
 	}
 	if !isValidGoodreadsURL(sc.URL) {
-		return nil, fmt.Errorf("invalid goodreads list URL")
+		return nil, data.NonRetry(fmt.Errorf("invalid goodreads list URL"))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sc.URL.String(), nil)
@@ -47,6 +47,10 @@ func (sc *GRScraper) Scrape(ctx context.Context, URL string) (*data.List, error)
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, data.NonRetry(fmt.Errorf("list not found"))
+	}
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {

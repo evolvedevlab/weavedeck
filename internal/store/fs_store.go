@@ -58,7 +58,11 @@ func (s *FileSystem) Save(list *data.List) error {
 
 func (s *FileSystem) Delete(slug string) error {
 	fullpath := filepath.Join(s.dirPath, slug) + ".md"
-	return os.Remove(fullpath)
+
+	if err := os.Remove(fullpath); err != nil {
+		return err
+	}
+	return s.triggerModify()
 }
 
 func (s *FileSystem) Close() error {

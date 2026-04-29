@@ -7,9 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -94,32 +92,4 @@ func main() {
 	<-quitch
 	fmt.Println("shutting down in 3secs...")
 	time.Sleep(time.Second * 3)
-}
-
-// WARN: shouldn't be used in HA setup
-// kept for reference
-func rebuildHugoLoop(dirPath string) {
-	ticker := time.NewTicker(time.Second * 30)
-	defer ticker.Stop()
-
-	filepath := filepath.Join(dirPath, config.TriggerModifyFilename)
-
-	var lastModAt int64
-	for range ticker.C {
-		info, err := os.Stat(filepath)
-		if err == nil {
-			mod := info.ModTime().Unix()
-			if mod > lastModAt {
-				log.Println("changes detected → rebuilding")
-
-				cmd := exec.Command("hugo", "-s", "site", "--minify")
-				if err := cmd.Run(); err != nil {
-					slog.Error("rebuild error", "err", err)
-					continue
-				}
-
-				lastModAt = mod
-			}
-		}
-	}
 }
