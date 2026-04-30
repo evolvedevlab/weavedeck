@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rebuilder
-  namespace: weaveset
+  namespace: weavedeck
 spec:
   replicas: 1
   strategy:
@@ -19,7 +19,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: rebuilder
-          image: weaveset-rebuild:latest
+          image: weavedeck-rebuild:latest
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 1000

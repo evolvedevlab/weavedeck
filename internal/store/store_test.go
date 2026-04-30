@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/evolvedevlab/weaveset/data"
+	"github.com/evolvedevlab/weavedeck/data"
 	"github.com/stretchr/testify/assert"
 )
 

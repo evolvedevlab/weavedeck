@@ -13,13 +13,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/evolvedevlab/weaveset/apiserver"
-	"github.com/evolvedevlab/weaveset/config"
-	"github.com/evolvedevlab/weaveset/internal"
-	"github.com/evolvedevlab/weaveset/internal/queue"
-	"github.com/evolvedevlab/weaveset/internal/scraper"
-	"github.com/evolvedevlab/weaveset/internal/store"
-	"github.com/evolvedevlab/weaveset/util"
+	"github.com/evolvedevlab/weavedeck/apiserver"
+	"github.com/evolvedevlab/weavedeck/config"
+	"github.com/evolvedevlab/weavedeck/internal"
+	"github.com/evolvedevlab/weavedeck/internal/queue"
+	"github.com/evolvedevlab/weavedeck/internal/scraper"
+	"github.com/evolvedevlab/weavedeck/internal/store"
+	"github.com/evolvedevlab/weavedeck/util"
 	"github.com/joho/godotenv"
 )
 

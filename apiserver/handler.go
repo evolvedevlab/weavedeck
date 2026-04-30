@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/evolvedevlab/weaveset/data"
-	"github.com/evolvedevlab/weaveset/internal/queue"
-	"github.com/evolvedevlab/weaveset/internal/store"
+	"github.com/evolvedevlab/weavedeck/data"
+	"github.com/evolvedevlab/weavedeck/internal/queue"
+	"github.com/evolvedevlab/weavedeck/internal/store"
 	"github.com/google/uuid"
 )
 

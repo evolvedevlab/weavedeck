@@ -7,7 +7,7 @@ services:
     image: redis:8-alpine
     container_name: wearedis
     networks:
-      - weaveset
+      - weavedeck
     restart: unless-stopped
     command:
       [
@@ -21,13 +21,13 @@ services:
       - redis_data:/data
 
   apiserver:
-    image: weaveset-apiserver:latest
+    image: weavedeck-apiserver:latest
     container_name: apiserver
     restart: unless-stopped
     depends_on:
       - redis
     networks:
-      - weaveset
+      - weavedeck
     ports:
       - "3000:3000"
     user: "1000:1000"
@@ -39,11 +39,11 @@ services:
       - ./site:/app/site
 
   worker:
-    image: weaveset-worker:latest
+    image: weavedeck-worker:latest
     container_name: worker
     restart: unless-stopped
     networks:
-      - weaveset
+      - weavedeck
     depends_on:
       - redis
     user: "1000:1000"
@@ -55,7 +55,7 @@ services:
       - ./site:/app/site
 
   rebuilder:
-    image: weaveset-rebuild:latest
+    image: weavedeck-rebuild:latest
     container_name: rebuilder
     restart: unless-stopped
     user: "1000:1000"
@@ -79,7 +79,7 @@ services:
         - "--query.max-concurrency=5"
         - "--query.max-samples=5000000"
       networks:
-        - weaveset
+        - weavedeck
       restart: unless-stopped
 
   promtail:
@@ -87,7 +87,7 @@ services:
     container_name: promtail
     restart: unless-stopped
     networks:
-      - weaveset
+      - weavedeck
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock
@@ -99,7 +99,7 @@ services:
     image: grafana/loki:latest
     container_name: loki
     networks:
-      - weaveset
+      - weavedeck
     command: -config.file=/etc/loki/loki-config.yml
     volumes:
       - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
@@ -110,7 +110,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     networks:
-      - weaveset
+      - weavedeck
     ports:
       - "4000:3000"
     environment:
@@ -128,5 +128,5 @@ volumes:
   loki_data:
 
 networks:
-  weaveset:
+  weavedeck:
     external: true

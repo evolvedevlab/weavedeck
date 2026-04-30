@@ -7,8 +7,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/evolvedevlab/weaveset/config"
-	"github.com/evolvedevlab/weaveset/data"
+	"github.com/evolvedevlab/weavedeck/config"
+	"github.com/evolvedevlab/weavedeck/data"
 )
 
 const (

@@ -1,4 +1,4 @@
-APP_NAME=weaveset
+APP_NAME=weavedeck
 
 api:
 	@go build -o bin/$(APP_NAME)-apiserver ./cmd/apiserver
@@ -17,12 +17,12 @@ test:
 	@go test -v -count=1 ./...
 
 docker-buildsimple:
-	@docker build -t weaveset-simple -f infra/docker/simple.Dockerfile .
+	@docker build -t weavedeck-simple -f infra/docker/simple.Dockerfile .
 
 docker-buildall:
-	@docker build -t weaveset-apiserver -f infra/docker/apiserver.Dockerfile .
-	@docker build -t weaveset-worker -f infra/docker/worker.Dockerfile .
-	@docker build -t weaveset-rebuild -f infra/docker/rebuild.Dockerfile .
+	@docker build -t weavedeck-apiserver -f infra/docker/apiserver.Dockerfile .
+	@docker build -t weavedeck-worker -f infra/docker/worker.Dockerfile .
+	@docker build -t weavedeck-rebuild -f infra/docker/rebuild.Dockerfile .
 
 reset-site:
 	@rm -rf site/content/list

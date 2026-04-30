@@ -1,6 +1,6 @@
-**Weaveset** is a personal, local-first tool that helps you collect and revisit curated lists from across the internet — like *“100 must-read books”* or *“Top 10 sci-fi movies”*.
+**Weavedeck** is a personal, local-first tool that helps you collect and revisit curated lists from across the internet — like *“100 must-read books”* or *“Top 10 sci-fi movies”*.
 
-Instead of bookmarking and forgetting, Weaveset quietly builds your own structured library of things you actually wanted to explore.
+Instead of bookmarking and forgetting, Weavedeck quietly builds your own structured library of things you actually wanted to explore.
 
 ## Features
 - Aggregate curated lists from multiple sources
@@ -11,15 +11,16 @@ Instead of bookmarking and forgetting, Weaveset quietly builds your own structur
 
 ## Installation (Docker)
 
-The easiest way to run Weaveset is via Docker.
+The easiest way to run Weavedeck is via Docker.
 
 ### 1. Create a `docker-compose.yml`
 
 ```yaml
+---
 services:
-  weaveset:
-    image: ghcr.io/evolvedevlab/weaveset:latest
-    container_name: weaveset
+  weavedeck:
+    image: ghcr.io/evolvedevlab/weavedeck:latest
+    container_name: weavedeck
     restart: unless-stopped
     ports:
       - "3000:3000" # change to "4000:3000" if needed
@@ -38,7 +39,7 @@ volumes:
 ### 2. Add `hugo.toml`
 
 ```sh
-wget https://github.com/evolvedevlab/weaveset/raw/refs/heads/main/site/hugo.toml
+wget https://github.com/evolvedevlab/weavedeck/raw/refs/heads/main/site/hugo.toml
 ```
 
 You can tweak the site by editing `hugo.toml`.
@@ -60,8 +61,8 @@ Now open:
 ### Steps
 
 ```bash
-git clone https://github.com/evolvedevlab/weaveset.git
-cd weaveset
+git clone https://github.com/evolvedevlab/weavedeck.git
+cd weavedeck
 make simple
 ```
 

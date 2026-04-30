@@ -6,8 +6,8 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/evolvedevlab/weaveset/data"
-	"github.com/evolvedevlab/weaveset/util"
+	"github.com/evolvedevlab/weavedeck/data"
+	"github.com/evolvedevlab/weavedeck/util"
 )
 
 type FilepathGeneratorFunc func(*data.List) string

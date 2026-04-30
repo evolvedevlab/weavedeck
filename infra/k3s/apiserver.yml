@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: apiserver
-  namespace: weaveset
+  namespace: weavedeck
 spec:
   replicas: 1
   selector:
@@ -17,7 +17,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: apiserver
-          image: weaveset-apiserver:latest
+          image: weavedeck-apiserver:latest
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 1000
@@ -30,7 +30,7 @@ spec:
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: weaveset-secrets
+                  name: weavedeck-secrets
                   key: REDIS_PASSWORD
           volumeMounts:
             - name: site
@@ -45,7 +45,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: apiserver
-  namespace: weaveset
+  namespace: weavedeck
 spec:
   type: NodePort
   selector:

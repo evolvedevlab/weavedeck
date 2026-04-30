@@ -6,10 +6,10 @@ scrape_configs:
     static_configs:
       - targets: ["prometheus:9090"]
 
-  - job_name: "weaveset-apiserver"
+  - job_name: "weavedeck-apiserver"
     static_configs:
       - targets: ["apiserver:2122"]
 
-  - job_name: "weaveset-worker"
+  - job_name: "weavedeck-worker"
     static_configs:
       - targets: ["worker:2122"]

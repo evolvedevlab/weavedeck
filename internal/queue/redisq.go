@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/evolvedevlab/weaveset/config"
-	"github.com/evolvedevlab/weaveset/data"
+	"github.com/evolvedevlab/weavedeck/config"
+	"github.com/evolvedevlab/weavedeck/data"
 	"github.com/redis/go-redis/v9"
 )
 

@@ -1,8 +1,8 @@
 ---
 services:
-  weaveset:
-    image: ghcr.io/evolvedevlab/weaveset:latest
-    container_name: weaveset
+  weavedeck:
+    image: ghcr.io/evolvedevlab/weavedeck:latest
+    container_name: weavedeck
     restart: unless-stopped
     ports:
       - "3000:3000" # for diff port "4000:3000"

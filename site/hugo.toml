@@ -1,6 +1,6 @@
 baseURL = 'http://127.0.0.1:1313/'
 locale = 'en-us'
-title = 'Weaveset'
+title = 'Weavedeck'
 theme = 'stack'
 
 [Params]

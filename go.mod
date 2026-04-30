@@ -1,4 +1,4 @@
-module github.com/evolvedevlab/weaveset
+module github.com/evolvedevlab/weavedeck
 
 go 1.25.0
 

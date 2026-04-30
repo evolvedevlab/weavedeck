@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/evolvedevlab/weaveset/internal/queue"
-	"github.com/evolvedevlab/weaveset/internal/store"
+	"github.com/evolvedevlab/weavedeck/internal/queue"
+	"github.com/evolvedevlab/weavedeck/internal/store"
 )
 
 type ApiServer struct {

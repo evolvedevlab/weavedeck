@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/evolvedevlab/weaveset/data"
+	"github.com/evolvedevlab/weavedeck/data"
 )
 
 var (

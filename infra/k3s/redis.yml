@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
-  namespace: weaveset
+  namespace: weavedeck
 spec:
   replicas: 1
   selector:
@@ -30,7 +30,7 @@ spec:
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: weaveset-secrets
+                  name: weavedeck-secrets
                   key: REDIS_PASSWORD
           volumeMounts:
             - name: redis-data
@@ -46,7 +46,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis
-  namespace: weaveset
+  namespace: weavedeck
 spec:
   selector:
     app: redis

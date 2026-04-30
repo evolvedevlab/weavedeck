@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/evolvedevlab/weaveset/data"
-	"github.com/evolvedevlab/weaveset/internal/store"
+	"github.com/evolvedevlab/weavedeck/data"
+	"github.com/evolvedevlab/weavedeck/internal/store"
 )
 
 type Scraper interface {
