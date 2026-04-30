@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -31,9 +32,17 @@ func main() {
 		isProd     = util.GetEnv("ENVIRONMENT") == "production"
 		listenAddr = util.GetEnv("LISTEN_ADDR", ":3000")
 
-		contentDirPath = util.GetEnv("CONTENT_DIR_PATH", "site/content/list")
-		publicDirPath  = util.GetEnv("PUBLIC_DIR_PATH", "site/public")
+		contentDirPath      = util.GetEnv("CONTENT_DIR_PATH", "site/content/list")
+		publicDirPath       = util.GetEnv("PUBLIC_DIR_PATH", "site/public")
+		rebuildIntervalSecs = 10
 	)
+	if v := util.GetEnv("REBUILD_INTERVAL"); len(v) > 0 {
+		var err error
+		rebuildIntervalSecs, err = strconv.Atoi(v)
+		if err != nil {
+			log.Fatalf("invalid REBUILD_INTERVAL variable: %+v\n", err)
+		}
+	}
 
 	l := internal.NewLogger(isProd)
 	slog.SetDefault(l)
@@ -47,18 +56,19 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool := queue.NewWorkerPool(10, 100)
+	poolq := queue.NewWorkerPool(10, 100)
 
 	log.Println("Consume loop started")
-	go rebuildHugoLoop(contentDirPath, time.Millisecond*5)
+
+	go rebuildHugoLoop(ctx, contentDirPath, time.Second*time.Duration(rebuildIntervalSecs))
 	go func() {
-		if err := pool.Consume(ctx, scraper.NewHandler(fsStore)); err != nil {
+		if err := poolq.Consume(ctx, scraper.NewHandler(fsStore)); err != nil {
 			close(quitch)
 			log.Println("consume error:", err)
 		}
 	}()
 
-	s := apiserver.New(listenAddr, publicDirPath, pool, fsStore)
+	s := apiserver.New(listenAddr, publicDirPath, poolq, fsStore)
 	go func() {
 		if err := s.Start(); err != nil {
 			close(quitch)
@@ -71,27 +81,32 @@ func main() {
 	time.Sleep(time.Second * 3)
 }
 
-func rebuildHugoLoop(dirPath string, dur time.Duration) {
-	ticker := time.NewTicker(dur)
+func rebuildHugoLoop(ctx context.Context, dirPath string, d time.Duration) {
+	ticker := time.NewTicker(d)
 	defer ticker.Stop()
 
 	filepath := filepath.Join(dirPath, config.TriggerModifyFilename)
 
 	var lastModAt int64
-	for range ticker.C {
-		info, err := os.Stat(filepath)
-		if err == nil {
-			mod := info.ModTime().Unix()
-			if mod > lastModAt {
-				log.Println("changes detected → rebuilding")
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			info, err := os.Stat(filepath)
+			if err == nil {
+				mod := info.ModTime().Unix()
+				if mod > lastModAt {
+					log.Println("changes detected → rebuilding")
 
-				cmd := exec.Command("hugo", "-s", "site", "--minify")
-				if err := cmd.Run(); err != nil {
-					slog.Error("rebuild error", "err", err)
-					continue
+					cmd := exec.CommandContext(ctx, "hugo", "-s", "site", "--minify")
+					if err := cmd.Run(); err != nil {
+						slog.Error("rebuild error", "err", err)
+						continue
+					}
+
+					lastModAt = mod
 				}
-
-				lastModAt = mod
 			}
 		}
 	}

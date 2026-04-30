@@ -159,13 +159,14 @@ func (q *RedisQueue) processMessage(ctx context.Context, msg redis.XMessage, job
 		// metrics
 		jobsProcessedTotal.WithLabelValues("fail").Inc()
 
-		// ACK if its an non-retryable error
+		// if its an non-retryable error
 		var nrErr data.NonRetryableError
 		if errors.As(err, &nrErr) {
 			if err := q.client.XAck(ctx, q.stream, q.group, msg.ID).Err(); err != nil {
 				return err
 			}
-			return nil
+			err = q.client.Del(ctx, getRetryKey(job.ID)).Err()
+			return err
 		}
 
 		// increment retry count

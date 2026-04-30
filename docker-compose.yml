@@ -1,21 +1,18 @@
 ---
 services:
-  redis:
-    image: redis:8-alpine
-    container_name: redis
+  weaveset:
+    image: ghcr.io/evolvedevlab/weaveset:latest
+    container_name: weaveset
     restart: unless-stopped
-    command:
-      [
-        "redis-server",
-        "--requirepass", "${REDIS_PASSWORD}",
-        "--appendonly", "yes",
-        "--maxmemory", "256mb",
-        "--maxmemory-policy", "noeviction",
-      ]
     ports:
-      - "6379:6379"
+      - "3000:3000" # for diff port "4000:3000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - REBUILD_INTERVAL=10 # in seconds
     volumes:
-      - redis_data:/data
+      - site_data:/app/site
+      - ./hugo.toml:/app/site/hugo.toml
 
 volumes:
-  redis_data:
+  site_data:

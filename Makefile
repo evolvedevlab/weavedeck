@@ -16,7 +16,10 @@ simple:
 test:
 	@go test -v -count=1 ./...
 
-docker-build:
+docker-buildsimple:
+	@docker build -t weaveset-simple -f infra/docker/simple.Dockerfile .
+
+docker-buildall:
 	@docker build -t weaveset-apiserver -f infra/docker/apiserver.Dockerfile .
 	@docker build -t weaveset-worker -f infra/docker/worker.Dockerfile .
 	@docker build -t weaveset-rebuild -f infra/docker/rebuild.Dockerfile .

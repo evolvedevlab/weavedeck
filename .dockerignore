@@ -2,5 +2,12 @@ bin
 .git*
 .env*
 test
-site
+testdata
+site/public
+site/resources
+site/content/list/*.md
+site/content/list/.changed
 infra
+docker-compose.yml
+Makefile
+README.md
